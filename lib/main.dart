@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:my_app/profile_screen.dart';
 
 import 'signup.dart';
 
@@ -74,6 +75,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _success = 2;
         _userEmail = user.email!;
       });
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context)=>ProfileScreen()));
     } else {
       setState(() {
         _success = 3;
