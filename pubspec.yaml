@@ -31,8 +31,11 @@ environment:
 dependencies:
   
   firebase_auth: ^4.2.2
+  firebase_storage: ^11.0.9
   flutter:
     sdk: flutter
+  image_picker: ^0.8.6
+  permission_handler: ^10.2.0
 
     
 
