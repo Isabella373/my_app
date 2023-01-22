@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:my_app/food.dart';
 import 'package:my_app/profile_screen.dart';
 import 'package:my_app/record_history.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -9,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 
 
@@ -21,29 +24,93 @@ class AddNewTrip extends StatefulWidget{
 }
 
 class _AddNewTripState extends State<AddNewTrip>{
- 
-  uploadImage() async {
+ final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  List _subingredients = [];
+  Food _currentFood = Food();
+  String _imageUrl = 'https://i.imgur.com/sUFH1Aq.png';
+  File? _imageFile;
+  TextEditingController subingredientController = new TextEditingController();
+
+
+@override
+void initState(){
+  super.initState();
+}
+
+
+  _showImage() {
+    if (_imageFile == null && _imageUrl == null) {
+      return Text("image placeholder");
+    } else if (_imageFile != null) {
+      print('showing image from local file');
+
+      return Stack(
+        alignment: AlignmentDirectional.bottomCenter,
+        children: <Widget>[
+          Image.file(
+            _imageFile!,
+            fit: BoxFit.cover,
+            height: 250,
+          ),
+          FloatingActionButton.extended(
+            heroTag: "btn1",
+            label: Text("Image"),
+        icon: Icon(Icons.add_a_photo),
+            onPressed: () => _getLocalImage(),
+          )
+        ],
+      );
+    } else if (_imageUrl != null) {
+      print('showing image from url');
+
+      return Stack(
+        alignment: AlignmentDirectional.bottomCenter,
+        children: <Widget>[
+          Image.network(
+            _imageUrl,
+            width: MediaQuery.of(context).size.width,
+            fit: BoxFit.cover,
+            height: 250,
+          ),
+          FloatingActionButton.extended(
+            heroTag: "btn2",
+            label: Text("Image"),
+        icon: Icon(Icons.add_a_photo),
+            onPressed: () => _getLocalImage(),
+          )
+        ],
+      );
+    }
+  }
+
+  _getLocalImage() async {
     final _firebaseStorage = FirebaseStorage.instance;
-    final _imagePicker = ImagePicker();
+    ImagePicker _imagePicker = ImagePicker();
     PickedFile image;
     //Check Permissions
     await Permission.photos.request();
 
     var permissionStatus = await Permission.photos.status;
+    if(permissionStatus.isDenied){
+      openAppSettings();
+    }
 
     if (permissionStatus.isGranted){
       //Select Image
-      image = (await _imagePicker.getImage(source: ImageSource.gallery))!;
+      
+      XFile? image =
+                         await _imagePicker.pickImage(source: ImageSource.gallery);
+                    print('${image?.path}');
+      if (image == null) return;
       File file = File(image.path);
 
       if (image != null){
-        //Upload to Firebase
-        var snapshot = await _firebaseStorage.ref()
-        .child('images/imageName')
-        .putFile(file);
-        var downloadUrl = await snapshot.ref.getDownloadURL();
+
         setState(() {
-          var imageUrl = downloadUrl;
+
+          _imageFile = file;
         });
       } else {
         print('No Image Path Received');
@@ -52,61 +119,187 @@ class _AddNewTripState extends State<AddNewTrip>{
       print('Permission not granted. Try Again with permission access');
     }
   }
-  
-  String imageUrl = "https://i.imgur.com/sUFH1Aq.png";
- 
+
+  Widget _buildNameField() {
+    return TextFormField(
+      decoration: InputDecoration(labelText: 'Name'),
+      initialValue: _currentFood.name,
+      keyboardType: TextInputType.text,
+      style: TextStyle(fontSize: 20),
+      validator: (String? value) {
+        if (value!.isEmpty) {
+          return 'Name is required';
+        }
+
+        if (value.length < 3 || value.length > 20) {
+          return 'Name must be more than 3 and less than 20';
+        }
+
+        return null;
+      },
+      onSaved: (String? value) {
+        _currentFood.name = value!;
+      },
+    );
+  }
+
+  Widget _buildCategoryField() {
+    return TextFormField(
+      decoration: InputDecoration(labelText: 'Distance'),
+      initialValue: _currentFood.category,
+      keyboardType: TextInputType.text,
+      style: TextStyle(fontSize: 20),
+      validator: (String? value) {
+        if (value!.isEmpty) {
+          return 'Distance is required';
+        }
+
+        if (value.length < 3 || value.length > 20) {
+          return 'Category must be more than 3 and less than 20';
+        }
+
+        return null;
+      },
+      onSaved: (String? value) {
+        _currentFood.category = value!;
+      },
+    );
+  }
+
+  _buildSubingredientField() {
+    return SizedBox(
+      width: 200,
+      child: TextField(
+        controller: subingredientController,
+        keyboardType: TextInputType.text,
+        decoration: InputDecoration(labelText: 'Description'),
+        style: TextStyle(fontSize: 20),
+      ),
+    );
+  }
+
+  _onFoodUploaded(Food food) {
+    Navigator.pop(context);
+  }
+
+  _addSubingredient(String text) {
+    if (text.isNotEmpty) {
+      setState(() {
+        _subingredients.add(text);
+      });
+      subingredientController.clear();
+    }
+  }
+
+  _saveFood() {
+    print('saveFood Called');
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    _formKey.currentState!.save();
+
+    print('form saved');
+
+    _currentFood.subIngredients = _subingredients;
+
+    //uploadFoodAndImage(_currentFood, widget.isUpdating, _imageFile, _onFoodUploaded);
+
+    print("name: ${_currentFood.name}");
+    print("category: ${_currentFood.category}");
+    print("subingredients: ${_currentFood.subIngredients.toString()}");
+    print("_imageFile ${_imageFile.toString()}");
+    print("_imageUrl $_imageUrl");
+  }
+
   @override
   Widget build(BuildContext context) {
-    return new Scaffold(
+    return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text('Upload Evidence', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),),
         centerTitle:true,
         elevation:0.0,
         backgroundColor: Colors.white,
       ),
-      body: Container(
-        color: Colors.white,
-        child: Column(  
-          children: <Widget>[
-            Container(
-              margin: EdgeInsets.all(15),
-              padding: EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.all(
-                  Radius.circular(15),
-                ),
-                border: Border.all(color: Colors.white),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(2, 2),
-                    spreadRadius: 2,
-                    blurRadius: 1,
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(32),
+        child: Form(
+          key: _formKey,
+          //autovalidate: true,
+          child: Column(children: <Widget>[
+            _showImage(),
+            SizedBox(height: 16),
+       
+            SizedBox(height: 16),
+            _imageFile == null && _imageUrl == null
+                ? ButtonTheme(
+                    child: FloatingActionButton(
+                      heroTag: "btn3",
+                      onPressed: () => _getLocalImage(),
+                      child: Text(
+                        'Add Image',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  )
+                : SizedBox(height: 0),
+            _buildNameField(),
+            _buildCategoryField(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                _buildSubingredientField(),
+                ButtonTheme(
+                  child: FloatingActionButton(
+                    heroTag: "btn4",
+                    child: Text('Add', style: TextStyle(color: Colors.white)),
+                    onPressed: () => _addSubingredient(subingredientController.text),
                   ),
-                ],
-              ),
-              child: (imageUrl != null)
-                ? Image.network(imageUrl)
-                : Image.network('https://i.imgur.com/sUFH1Aq.png')
+                )
+              ],
             ),
-            SizedBox(height: 20.0,),
-   FloatingActionButton.extended(
-  label: Text("Upload Image", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
-  onPressed: (){
-    uploadImage();
-  },
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(18.0),
-    side: BorderSide(color: Colors.blue)
-  ),
-  elevation: 5.0,
-  splashColor: Colors.grey,
-),
-          ],
+            SizedBox(height: 16),
+            GridView.count(
+              shrinkWrap: true,
+              scrollDirection: Axis.vertical,
+              padding: EdgeInsets.all(8),
+              crossAxisCount: 3,
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+              children: _subingredients
+                  .map(
+                    (ingredient) => Card(
+                      color: Colors.black54,
+                      child: Center(
+                        child: Text(
+                          ingredient,
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            )
+          ]),
         ),
       ),
-     floatingActionButton: Row(
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children:[
+      FloatingActionButton.extended(
+        heroTag: "btn5",
+        label: Text("Submit"),
+        icon: Icon(Icons.save),
+        onPressed: () {
+          FocusScope.of(context).requestFocus(new FocusNode());
+          _saveFood();
+        },
+        
+      ),
+
+
+      Row(
     mainAxisAlignment: MainAxisAlignment.end,
     children: [
       FloatingActionButton.extended(
@@ -135,7 +328,11 @@ class _AddNewTripState extends State<AddNewTrip>{
       )
     ]
   )
+        ]
 
+
+      
+    )
     );
   }
 }
